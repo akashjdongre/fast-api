@@ -6,7 +6,7 @@ from routes import auth, products, orders, websocket
 #---Use this database connection (engine) to create the tables.
 Base.metadata.create_all(bind=engine)
 
-app = FastAPI(title="E-commerce API", version="3.0.0")
+app = FastAPI(title="E-Commerce API", version="3.0.0")
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
@@ -17,4 +17,4 @@ app.include_router(websocket.router)
 
 @app.get("/", tags=["Health"])
 def root():
-    return {"message": "E-commerce API running 🚀"}
+    return {"message": "E-Commerce API running 🚀"}

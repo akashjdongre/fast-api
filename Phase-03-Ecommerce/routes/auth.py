@@ -4,31 +4,30 @@ from sqlalchemy.orm import Session
 from database import get_db
 from models.user import User
 from core.auth import hash_password, verify_password, create_access_token
+from response.response import RespNewUser,NewUser
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
 
-@router.post("/register", status_code=201)
+@router.post("/register", response_model=RespNewUser, status_code=status.HTTP_201_CREATED)
 def register(
-    name: str, 
-    email: str, 
-    password: str, 
+    form_input:NewUser,
     db: Session = Depends(get_db)
-    ):
-    # Check duplicate email
-    existing = db.query(User).filter(User.email == email).first()
-    if existing:
-        raise HTTPException(status_code=400, detail=f"User Email : {email} already registered")
+    ):  
+    
+    email_exist = db.query(User).filter(User.email == form_input.email).first()
+    if email_exist:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"User Email : {form_input.email} already registered")
 
-    user = User(
-        name=name,
-        email=email,
-        password=hash_password(password)   # never store plain text
+    user_data = User(
+        name=form_input.name,
+        email=form_input.email,
+        password=hash_password(form_input.password)   # never store plain text
     )
-    db.add(user)
+    db.add(user_data)
     db.commit()
-    db.refresh(user)
-    return {"message": "User created", "id": user.id}
-
+    db.refresh(user_data)
+    return {"message": "User created", "id": user_data.id}
+ 
 
 @router.post("/login")
 def login(

@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query
 from sqlalchemy.orm import Session
 from typing import List, Optional
 import shutil, os, uuid
+from response.response import RespAllPRoducts
 
 from database import get_db
 from models.product import Product
@@ -15,7 +16,7 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 
 # PUBLIC — list products with pagination & search
-@router.get("/")
+@router.get("/", response_model=RespAllPRoducts)
 def list_products(
     db: Session = Depends(get_db),
     page: int = Query(1, ge=1),
