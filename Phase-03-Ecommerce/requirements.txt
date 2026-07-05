@@ -1,0 +1,45 @@
+fastapi                 # Python driver to connect SQLAlchemy with MySQL.
+uvicorn[standard]       # ASGI server that runs FastAPI. 
+                        # Without Uvicorn your FastAPI application cannot serve requests.
+sqlalchemy              # ORM (Object Relational Mapper)
+alembic                 # Database Migration Tool.
+PyMySQL                 # Python driver to connect SQLAlchemy with MySQL.
+cryptography            # required by PyMySQL for auth # Provides encryption algorithms.
+pydantic-settings       # Purpose -> Read configuration from .env File
+python-jose[cryptography] # Creates and verifies JWT Tokens.
+passlib[bcrypt]           # Purpose -> Hashes passwords.
+redis                     # Redis is an in-memory database.
+celery                    # Background Task Queue.
+python-multipart          # Required for -> Upload Files | Upload Images | Form Data
+pillow                    # Python Imaging Library. | Process images - Resize , Crop , Compress
+websockets                # Real-time communication.
+argon2-cffi
+
+
+#-----------------------Architecture -----------------------
+#
+#                    Browser / Mobile
+#                           │
+#                           ▼
+#                  Uvicorn (ASGI Server)
+#                           │
+#                           ▼
+#                       FastAPI
+#                           │
+#      ┌──────────────┬───────────────┬──────────────┐
+#      ▼              ▼               ▼              ▼
+# Authentication   REST APIs     WebSockets     Background Tasks
+#      │              │               │              │
+# python-jose     SQLAlchemy      websockets     Celery
+# passlib            │                              │
+#      │             ▼                              ▼
+#      │         PyMySQL                       Redis (Broker)
+#      │             │                              │
+#      └────────────►MySQL◄─────────────────────────┘
+
+# Other supporting components:
+# - Alembic: manages database schema migrations.
+# - pydantic-settings: loads configuration from `.env` and environment variables.
+# - python-multipart: handles file uploads and form data.
+# - Pillow: processes uploaded images.
+# - cryptography: provides encryption primitives used by authentication libraries and some MySQL authentication methods.
