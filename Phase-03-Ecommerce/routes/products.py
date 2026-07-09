@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from typing import List, Optional
 import shutil, os, uuid
 from response.response import RespAllPRoducts
-
+from core.redis import redis_client
 from database import get_db
 from models.product import Product
 from core.dependencies import get_current_user, require_admin
@@ -16,25 +16,39 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 
 # PUBLIC — list products with pagination & search
-@router.get("/", response_model=RespAllPRoducts)
+@router.get("/")#, response_model=RespAllPRoducts)
 def list_products(
     db: Session = Depends(get_db),
     page: int = Query(1, ge=1),
     limit: int = Query(10, le=100),
     search: Optional[str] = Query(None)
 ):
+    # cache_key = f"products:{page}:{limit}"
+    # try:
+    #     cached_data = redis_client.get(cache_key)
+    # except Exception:
+    #     cached_data = None
+    # source = "database"
+    # if cached_data:
+    #     source = "cache"
+
     query = db.query(Product)
     if search:
         query = query.filter(Product.name.ilike(f"%{search}%"))
-
     total   = query.count()
     products = query.offset((page - 1) * limit).limit(limit).all()
+    data = [
+        {
+            "page": page,
+            "limit": limit,
+            "results": products
+        }
+    ]
 
     return {
-        "total": total,
-        "page": page,
-        "limit": limit,
-        "results": products
+        "source": "mysql",
+        "data": data,
+        "count": total
     }
 
 # PUBLIC — get single product
@@ -80,7 +94,6 @@ def create_product(
     db.commit()
     db.refresh(product)
     return product
-
 
 # ADMIN ONLY — delete product
 @router.delete("/{product_id}", status_code=204)

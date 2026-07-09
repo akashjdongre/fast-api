@@ -23,6 +23,7 @@ class ProductResponse(BaseModel):
         from_attributes = True
 
 class RespAllPRoducts(BaseModel):
+    source: str
     total: int
     page: int
     limit: int
