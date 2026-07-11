@@ -1,49 +1,74 @@
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query
+from fastapi import APIRouter, Depends, HTTPException, File, Query, Request
+from fastapi import UploadFile
 from sqlalchemy.orm import Session
 from typing import List, Optional
 import shutil, os, uuid
-from response.response import RespAllPRoducts
+from response.response import RespAllPRoducts, RespSingleProducts, RespProductDelete
 from core.redis import redis_client
 from database import get_db
 from models.product import Product
 from core.dependencies import get_current_user, require_admin
 from models.user import User
+import json
 
 router = APIRouter(prefix="/products", tags=["Products"])
 
 UPLOAD_DIR = "static/uploads"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
-
 # PUBLIC — list products with pagination & search
-@router.get("/")#, response_model=RespAllPRoducts)
-def list_products(
+@router.get("/", response_model=RespAllPRoducts)
+async def list_products(
     db: Session = Depends(get_db),
     page: int = Query(1, ge=1),
     limit: int = Query(10, le=100),
     search: Optional[str] = Query(None)
 ):
-    # cache_key = f"products:{page}:{limit}"
-    # try:
-    #     cached_data = redis_client.get(cache_key)
-    # except Exception:
-    #     cached_data = None
-    # source = "database"
-    # if cached_data:
-    #     source = "cache"
+    cache_key = f"products:{page}:{limit}"
+    try:
+        cached_data = await redis_client.get(cache_key)
+    except Exception:
+        cached_data = None
+
+    if cached_data:
+        cached_list = json.loads(cached_data)
+        return {
+            "source": "redis-cache",
+            "data": cached_list,
+            "count": len(cached_list)
+        }
 
     query = db.query(Product)
     if search:
         query = query.filter(Product.name.ilike(f"%{search}%"))
-    total   = query.count()
+    total = query.count()
     products = query.offset((page - 1) * limit).limit(limit).all()
+
+    product_list = [
+        {
+            "id": p.id,
+            "name": p.name,
+            "description": p.description,
+            "price": p.price,
+            "stock": p.stock,
+            "image_url": p.image_url
+        }
+        for p in products
+    ]
+
     data = [
         {
             "page": page,
             "limit": limit,
-            "results": products
+            "results": product_list
         }
     ]
+
+    
+    try:
+        await redis_client.set(cache_key, json.dumps(data), ex=60)
+    except Exception as e:
+        print(e)
 
     return {
         "source": "mysql",
@@ -52,7 +77,7 @@ def list_products(
     }
 
 # PUBLIC — get single product
-@router.get("/{product_id}")
+@router.get("/{product_id}", response_model=RespSingleProducts)
 def get_product(product_id: int, db: Session = Depends(get_db)):
     product = db.query(Product).filter(Product.id == product_id).first()
     if not product:
@@ -60,7 +85,8 @@ def get_product(product_id: int, db: Session = Depends(get_db)):
     return product
 
 # ADMIN ONLY — create product with image upload
-@router.post("/", status_code=201)
+
+@router.post("/", status_code=201, response_model=RespSingleProducts)
 def create_product(
     name: str,
     description: str,
@@ -95,8 +121,9 @@ def create_product(
     db.refresh(product)
     return product
 
+ 
 # ADMIN ONLY — delete product
-@router.delete("/{product_id}", status_code=204)
+@router.delete("/{product_id}", status_code=200, response_model= RespProductDelete)
 def delete_product(
     product_id: int,
     db: Session = Depends(get_db),
@@ -107,3 +134,6 @@ def delete_product(
         raise HTTPException(status_code=404, detail="Product not found")
     db.delete(product)
     db.commit()
+
+    return {"message": "Product deleted successfully", "product_info": product}
+
