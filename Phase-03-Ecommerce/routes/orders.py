@@ -46,7 +46,6 @@ async def create_order(
 
     # Invalidate user's cached orders
     await redis_client.delete(f"orders:user:{current_user.id}")
-
     return order
 
 
