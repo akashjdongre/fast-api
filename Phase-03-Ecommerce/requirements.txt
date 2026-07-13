@@ -16,6 +16,11 @@ websockets                # Real-time communication.
 argon2-cffi
 email-validator         # Email validation for Pydantic
 
+#-----------------------Testing (PyTest) -----------------------
+pytest
+pytest-asyncio
+httpx
+coverage
 
 #-----------------------Architecture -----------------------
 #
