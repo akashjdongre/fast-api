@@ -1,4 +1,4 @@
-import pytest
+import pytest       # write test cases | check expected results
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -28,12 +28,17 @@ def override_get_db():
 
 app.dependency_overrides[get_db] = override_get_db
 
+#----- Fixtures is a way to provide a fixed baseline upon which tests can reliably and repeatedly execute. 
+#----- Fixtures are used to set up the necessary preconditions for tests, such as creating test data, initializing resources, 
+#----- or configuring the environment. They help ensure that tests run in a consistent and isolated manner, 
+#----- making it easier to identify issues and maintain test reliability.
+
 
 @pytest.fixture(autouse=True)
 def setup_db():
     """Create tables before each test, drop after"""
     Base.metadata.create_all(bind=engine)
-    yield
+    yield # pauses the fixture and lets the test execute.
     Base.metadata.drop_all(bind=engine)
 
 
@@ -79,3 +84,14 @@ def admin_token(db):
     db.commit()
     db.refresh(user)
     return create_access_token({"sub": str(user.id), "role": user.role})
+
+
+# This file builds a complete, isolated testing environment:
+# create_engine() ---->  connects to a separate SQLite test database.
+# TestingSessionLocal ----> creates database sessions for tests.
+# override_get_db() ----> ensures FastAPI uses the test database instead of the production one.
+# setup_db automatically creates tables before each test and removes them afterward.
+# client provides a TestClient for making API requests without running a server.
+# db provides a database session for inserting or querying test data.
+# customer_token and admin_token create test users and return valid JWTs, allowing you to test 
+# authenticated endpoints without calling the login API.
