@@ -11,6 +11,8 @@
 
 # Let's go through each line with examples.
 
+import io
+
 def test_register_success(client):
     response = client.post("/auth/register", params={
         "name": "Akash", "email": "akash@test.com", "password": "pass123"
