@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from database import get_db
@@ -6,14 +6,24 @@ from models.user import User
 from core.auth import hash_password, verify_password, create_access_token
 from response.response import RespNewUser,NewUser
 
+from core.limiter import limiter
+
 router = APIRouter(prefix="/auth", tags=["Auth"])
 
 @router.post("/register", response_model=RespNewUser, status_code=status.HTTP_201_CREATED)
-def register(
-    form_input:NewUser,
+async def register(
+    request: Request,  # accept either JSON body or query params
     db: Session = Depends(get_db)
     ):  
-    
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    params = dict(request.query_params)
+    data = {**body, **params}
+
+    form_input = NewUser(**data)
+
     email_exist = db.query(User).filter(User.email == form_input.email).first()
     if email_exist:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"User Email : {form_input.email} already registered")
@@ -30,7 +40,9 @@ def register(
  
 
 @router.post("/login")
+@limiter.limit("5/minute")  # Limit to 5 login attempts per minute
 def login(
+    request: Request,
     form_data: OAuth2PasswordRequestForm = Depends(),
     db: Session = Depends(get_db)
     ):

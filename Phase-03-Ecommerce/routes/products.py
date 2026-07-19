@@ -17,7 +17,7 @@ UPLOAD_DIR = "static/uploads"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 # PUBLIC — list products with pagination & search
-@router.get("/", response_model=RespAllPRoducts)
+@router.get("/")
 async def list_products(
     db: Session = Depends(get_db),
     page: int = Query(1, ge=1),
@@ -33,9 +33,8 @@ async def list_products(
     if cached_data:
         cached_list = json.loads(cached_data)
         return {
-            "source": "redis-cache",
-            "data": cached_list,
-            "count": len(cached_list)
+            "total": len(cached_list),
+            "results": cached_list
         }
 
     query = db.query(Product)
@@ -56,24 +55,14 @@ async def list_products(
         for p in products
     ]
 
-    data = [
-        {
-            "page": page,
-            "limit": limit,
-            "results": product_list
-        }
-    ]
-
-    
     try:
-        await redis_client.set(cache_key, json.dumps(data), ex=60)
+        await redis_client.set(cache_key, json.dumps(product_list), ex=60)
     except Exception as e:
         print(e)
 
     return {
-        "source": "mysql",
-        "data": data,
-        "count": total
+        "total": total,
+        "results": product_list
     }
 
 # PUBLIC — get single product

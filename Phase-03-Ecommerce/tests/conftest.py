@@ -1,12 +1,34 @@
+import os
+import sys
 import pytest       # write test cases | check expected results
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
+
+# Ensure direct pytest invocation can import project modules from the repo root.
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
+# Ensure test mode so app uses test-safe settings (no Docker Redis)
+os.environ["TESTING"] = "1"
 from main import app
 from database import Base, get_db
 from core.auth import create_access_token
 from models.user import User, UserRole
 from core.auth import hash_password
+
+# Patch core.redis to use a no-op async client during tests (avoids Docker Redis lookups)
+import core.redis as _cr
+class _DummyRedis:
+    async def get(self, *a, **k):
+        return None
+    async def setex(self, *a, **k):
+        return None
+    async def delete(self, *a, **k):
+        return None
+_cr.redis_client = _DummyRedis()
+# Also patch any modules that imported the redis client at import time
+import routes.orders as _orders
+_orders.redis_client = _DummyRedis()
 
 # Use separate in-memory SQLite for tests — never touch real DB
 SQLALCHEMY_TEST_URL = "sqlite:///./test.db"

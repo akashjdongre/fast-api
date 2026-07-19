@@ -13,7 +13,7 @@ def test_create_order_success(client, customer_token, admin_token):
     product_id = create_product_helper(client, admin_token)
 
     # Mock Celery task so email isn't actually sent during tests
-    with patch("app.routes.orders.send_order_confirmation.delay") as mock_task:
+    with patch("routes.orders.send_order_confirmation.delay") as mock_task:
         response = client.post(
             "/orders/",
             params={"product_id": product_id, "quantity": 2},
@@ -29,7 +29,7 @@ def test_create_order_success(client, customer_token, admin_token):
 def test_create_order_insufficient_stock(client, customer_token, admin_token):
     product_id = create_product_helper(client, admin_token, stock=1)
 
-    with patch("app.routes.orders.send_order_confirmation.delay"):
+    with patch("routes.orders.send_order_confirmation.delay"):
         response = client.post(
             "/orders/",
             params={"product_id": product_id, "quantity": 5},  # more than stock
@@ -41,7 +41,7 @@ def test_create_order_insufficient_stock(client, customer_token, admin_token):
 
 
 def test_create_order_product_not_found(client, customer_token):
-    with patch("app.routes.orders.send_order_confirmation.delay"):
+    with patch("routes.orders.send_order_confirmation.delay"):
         response = client.post(
             "/orders/",
             params={"product_id": 999, "quantity": 1},

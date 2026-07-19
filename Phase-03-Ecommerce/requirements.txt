@@ -22,6 +22,9 @@ pytest-asyncio
 httpx
 coverage
 
+#-----------------------Rate Limiting -----------------------
+slowapi
+
 #-----------------------Architecture -----------------------
 #
 #                    Browser / Mobile
