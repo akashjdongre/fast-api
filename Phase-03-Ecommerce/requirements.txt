@@ -1,5 +1,6 @@
 fastapi                 # Python driver to connect SQLAlchemy with MySQL.
 uvicorn[standard]       # ASGI server that runs FastAPI. 
+gunicorn                # Production worker manager for FastAPI.
                         # Without Uvicorn your FastAPI application cannot serve requests.
 sqlalchemy              # ORM (Object Relational Mapper)
 alembic                 # Database Migration Tool.

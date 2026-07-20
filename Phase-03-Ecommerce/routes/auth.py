@@ -11,6 +11,7 @@ from core.limiter import limiter
 router = APIRouter(prefix="/auth", tags=["Auth"])
 
 @router.post("/register", response_model=RespNewUser, status_code=status.HTTP_201_CREATED)
+@limiter.limit("5/minute")  # Limit to 5 registration attempts per minute
 async def register(
     request: Request,  # accept either JSON body or query params
     db: Session = Depends(get_db)

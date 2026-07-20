@@ -42,3 +42,28 @@ app.include_router(websocket.router)
 @app.get("/", tags=["Health"])
 def root():
     return {"message": "E-Commerce API running 🚀"}
+
+
+    #              Docker Build
+
+    #   +----------------------------+
+    #   | Stage 1 (Builder)          |
+    #   |----------------------------|
+    #   | Python 3.11                |
+    #   | Copy requirements.txt      |
+    #   | pip install                |
+    #   | Packages installed         |
+    #   +-------------+--------------+
+    #                 |
+    #                 | Copy only installed packages
+    #                 v
+    #   +----------------------------+
+    #   | Stage 2 (Runtime)          |
+    #   |----------------------------|
+    #   | Fresh Python image         |
+    #   | Create appuser             |
+    #   | Copy site-packages         |
+    #   | Copy executables           |
+    #   | Copy application code      |
+    #   | Run Gunicorn              |
+    #   +----------------------------+

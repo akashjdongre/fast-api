@@ -10,6 +10,7 @@ from models.product import Product
 from core.dependencies import get_current_user, require_admin
 from models.user import User
 import json
+from core.limiter import limiter
 
 router = APIRouter(prefix="/products", tags=["Products"])
 
@@ -76,7 +77,9 @@ def get_product(product_id: int, db: Session = Depends(get_db)):
 # ADMIN ONLY — create product with image upload
 
 @router.post("/", status_code=201, response_model=RespSingleProducts)
+@limiter.limit("10/minute")  # Limit to 10 product creations per minute
 def create_product(
+    request: Request, 
     name: str,
     description: str,
     price: float,
