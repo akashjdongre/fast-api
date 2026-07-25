@@ -1,163 +1,109 @@
 name: CI/CD Pipeline
 
-# Trigger: runs only when someone pushes to the main branch
 on:
   push:
     branches: [main]
 
-# Global environment variables — available in all jobs
 env:
   AWS_REGION: ap-south-1
-  ECR_REPOSITORY: fastapi-ecommerce                    # ✅ just the repo name, not full URI
+  ECR_REPOSITORY: fastapi-ecommerce
   ECS_CLUSTER: fastapi-ecommerce-cluster
   ECS_SERVICE: fastapi-ecommerce-service
   CONTAINER_NAME: fastapi-ecommerce-container
 
 jobs:
 
-  # ─────────────────────────────────────────────────────────────
-  # JOB 1 — Run Tests
-  # ─────────────────────────────────────────────────────────────
   test:
     runs-on: ubuntu-latest
-
     steps:
-      # Step 1 — Clone your repo into the VM
       - name: Checkout code
         uses: actions/checkout@v3
 
-      # Step 2 — Install Python 3.11
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.11'
-          cache: "pip"              # cache pip downloads between pipeline runs
+          cache: 'pip'
 
-      # Step 3 — Install all Python packages
       - name: Install dependencies
         run: |
-          python -m pip install --upgrade pip        # ✅ fixed: was "python install"
+          python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      # Step 4 — Run pytest with coverage
-      # These env vars override .env for CI environment
       - name: Run tests with Coverage
         env:
-          DATABASE_URL: sqlite:///./test.db           # SQLite — no MySQL needed in CI
+          DATABASE_URL: sqlite:///./test.db
           REDIS_URL: redis://localhost:6379/0
           SECRET_KEY: test-secret-key-for-ci
-          ENABLE_CELERY: false                        # skip Celery — no Redis in CI
-          ENABLE_REDIS_CACHE: false                   # skip Redis cache in CI
+          ENABLE_CELERY: false
+          ENABLE_REDIS_CACHE: false
         run: |
           coverage run -m pytest tests/ -v
           coverage report --fail-under=80
-        # coverage run    → tracks which lines were executed during tests
-        # -m pytest       → runs pytest as a module
-        # tests/          → run all tests in this folder
-        # -v              → verbose output, shows each test name
-        # --fail-under=80 → if coverage < 80%, exit code 1 → pipeline stops
 
-  # ─────────────────────────────────────────────────────────────
-  # JOB 2 — Build Docker Image & Push to ECR
-  # ─────────────────────────────────────────────────────────────
-  build-and-push:                                     # ✅ fixed: was "build and push" (spaces not allowed)
-    needs: test                                       # only runs if Job 1 passes
-    runs-on: ubuntu-latest                            # fresh Ubuntu VM — separate from Job 1
-
-    # This job's output — the full ECR image URL
-    # Job 3 reads this as: ${{ needs.build-and-push.outputs.image }}
+  build-and-push:
+    needs: test
+    runs-on: ubuntu-latest
     outputs:
       image: ${{ steps.build-image.outputs.image }}
-
-    steps:                                            # ✅ fixed: steps keyword was missing
-
-      # Step 1 — Clone repo (each job runs on fresh VM — no code yet)
-      - name: Checkout code                          # ✅ fixed: this step was missing entirely
+    steps:
+      - name: Checkout code
         uses: actions/checkout@v3
 
-      # Step 2 — Give this VM permission to talk to AWS
-      - name: Configure AWS credentials              # ✅ fixed: correct indentation under steps
+      - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v2
         with:
-          aws-access-key-id:      ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key:  ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region:             ${{ env.AWS_REGION }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
 
-      # Step 3 — Login Docker to ECR so we can push images
-      - name: Login to Amazon ECR                   # ✅ fixed: was wrongly nested inside previous step
+      - name: Login to Amazon ECR
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v1
-        # After this step:
-        # steps.login-ecr.outputs.registry = 103212121227.dkr.ecr.ap-south-1.amazonaws.com
 
-      # Step 4 — Build, tag, push Docker image to ECR
-      - name: Build, tag, and push image to ECR     # ✅ fixed: was wrongly nested inside previous step
+      - name: Build tag and push image to ECR
         id: build-image
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          # ECR_REGISTRY = 103212121227.dkr.ecr.ap-south-1.amazonaws.com
-          # ECR_REPOSITORY = fastapi-ecommerce (from global env)
-          # IMAGE_TAG = full git commit SHA (unique per commit — enables rollback)
           IMAGE_TAG: ${{ github.sha }}
         run: |
           docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
           echo "image=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> $GITHUB_OUTPUT
-        # echo "image=..." >> $GITHUB_OUTPUT
-        # → passes the full image URL to Job 3 via GitHub's output mechanism
 
-  # ─────────────────────────────────────────────────────────────
-  # JOB 3 — Deploy to AWS ECS
-  # ─────────────────────────────────────────────────────────────
   deploy:
-    needs: build-and-push                             # ✅ fixed: was "build and push"
-    runs-on: ubuntu-latest                            # another fresh VM
-
-    steps:                                            # ✅ fixed: steps keyword was missing
-
-      # Step 1 — Clone repo (needed for aws action files)
-      - name: Checkout code                          # ✅ fixed: this step was missing entirely
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
         uses: actions/checkout@v3
 
-      # Step 2 — Authenticate with AWS
-      - name: Configure AWS credentials              # ✅ fixed: this step was missing entirely
+      - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v2
         with:
-          aws-access-key-id:      ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key:  ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region:             ${{ env.AWS_REGION }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
 
-      # Step 3 — Download current task definition from AWS
-      # We update only the image — everything else (CPU, RAM, env vars) stays the same
       - name: Download current ECS task definition
         run: |
           aws ecs describe-task-definition \
-            --task-definition ecommerce-task \
+            --task-definition fastapi-ecommerce-app \
             --query taskDefinition \
             > task-definition.json
-        # --query taskDefinition → extracts just the taskDefinition object
-        # > task-definition.json → saves it as a file on this VM
 
-      # Step 4 — Replace old image URL with new one in the JSON
       - name: Update image in task definition
         id: task-def
         uses: aws-actions/amazon-ecs-render-task-definition@v1
         with:
-          task-definition:  task-definition.json
-          container-name:   ${{ env.CONTAINER_NAME }}
-          image:            ${{ needs.build-and-push.outputs.image }}  # ✅ matches job name exactly
+          task-definition: task-definition.json
+          container-name: ${{ env.CONTAINER_NAME }}
+          image: ${{ needs.build-and-push.outputs.image }}
 
-      # Step 5 — Actually deploy to ECS
-      # ECS rolling update:
-      # 1. Starts new tasks with new image
-      # 2. Health checks pass
-      # 3. ALB shifts traffic to new tasks
-      # 4. Old tasks stopped
-      # wait-for-service-stability: true → if health checks fail, ECS rolls back automatically
       - name: Deploy to ECS
         uses: aws-actions/amazon-ecs-deploy-task-definition@v1
         with:
-          task-definition:            ${{ steps.task-def.outputs.task-definition }}
-          service:                    ${{ env.ECS_SERVICE }}
-          cluster:                    ${{ env.ECS_CLUSTER }}
+          task-definition: ${{ steps.task-def.outputs.task-definition }}
+          service: ${{ env.ECS_SERVICE }}
+          cluster: ${{ env.ECS_CLUSTER }}
           wait-for-service-stability: true
