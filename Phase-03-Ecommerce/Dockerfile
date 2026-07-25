@@ -1,9 +1,10 @@
+# ─── Stage 1: Builder ─────────────────────────────────────#
 FROM python:3.12-slim as builder
 
 #---- Sets the current working directory inside the container. -----#
 WORKDIR /app
 
-#----- Install dependencies 
+#----- Copy only requirements first (layer cache trick)
 #----- sorurce(from your computer)) ---> destination (inside the container)---------#
 COPY requirements.txt .
 
@@ -30,14 +31,27 @@ COPY --from=builder /usr/local/bin /usr/local/bin
 # changes ownership to : appuser
 COPY --chown=appuser:appuser . .
 
+# Create uploads directory with correct permissions
+RUN mkdir -p static/uploads && \
+    chown -R appuser:appuser static/uploads
+
+# Switch to non-root user
+USER appuser
+
 # Expose port
 EXPOSE 8063
 
-# Production server: Gunicorn manages Uvicorn workers
-CMD ["python", "-m", "gunicorn", "main:app", \
+# Health check — Docker itself monitors this
+HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/')" \
+    || exit 1
+
+ # Production command — Gunicorn managing Uvicorn workers
+CMD ["gunicorn", "main:app", \
      "--workers", "4", \
      "--worker-class", "uvicorn.workers.UvicornWorker", \
      "--bind", "0.0.0.0:8063", \
      "--timeout", "120", \
-     "--access-logfile", "-"]
-
+     "--access-logfile", "-", \
+     "--error-logfile", "-", \
+     "--log-level", "info"]

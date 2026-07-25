@@ -1,0 +1,86 @@
+# docker-compose.prod.yml
+
+version: "3.9"
+
+services:
+
+  # ─── FastAPI App ──────────────────────────────────────────
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runtime          # use the runtime stage, not builder
+    container_name: ecommerce_api
+    ports:
+      - "8063:8063"
+    env_file:
+      - .env.prod              # production environment variables
+    depends_on:
+      redis:
+        condition: service_healthy    # wait for Redis to be ready
+    volumes:
+      - uploads_data:/home/appuser/app/app/static/uploads  # persist uploaded images
+    restart: unless-stopped    # auto-restart if container crashes
+    networks:
+      - ecommerce_network
+
+  # ─── Celery Worker ────────────────────────────────────────
+  celery_worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runtime
+    container_name: ecommerce_celery
+    command: ["celery", "-A", "tasks.celery_app", "worker",
+              "--loglevel=info", "--concurrency=2"]
+    env_file:
+      - .env.prod
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - ecommerce_network
+
+
+  # ─── Redis ────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: ecommerce_redis
+    command: redis-server --appendonly yes    # persist Redis data to disk
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data       # persist Redis data across restarts
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - ecommerce_network
+
+  # ─── Celery Flower (monitoring dashboard) ─────────────────
+  flower:
+    image: mher/flower:2.0
+    container_name: ecommerce_flower
+    command: celery --broker=redis://redis:6379/0 flower --port=5555
+    ports:
+      - "5555:5555"
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - ecommerce_network
+
+# ─── Named Volumes ────────────────────────────────────────────
+volumes:
+  redis_data:      # Redis data persists across restarts
+  uploads_data:    # Uploaded product images persist
+
+# ─── Network ──────────────────────────────────────────────────
+networks:
+  ecommerce_network:
+    driver: bridge
