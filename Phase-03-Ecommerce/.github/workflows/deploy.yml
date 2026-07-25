@@ -6,9 +6,9 @@ on:
 
 env:
   AWS_REGION: ap-south-1
-  ECR_REPOSITORY: fastapi-ecommerce
-  ECS_CLUSTER: fastapi-ecommerce-cluster
-  ECS_SERVICE: fastapi-ecommerce-service
+  ECR_REPOSITORY: fastapi/ecommerce-api
+  ECS_CLUSTER: fastapi-ecommerce-cluster-2507
+  ECS_SERVICE: fastapi-ecommerce-app-service-5zfd5au9
   CONTAINER_NAME: fastapi-ecommerce-container
 
 jobs:
